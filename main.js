@@ -42,6 +42,8 @@ function handleData(data){
     let sampleCount = avgData.fpsAmm; 
     let testTime = avgData.testTime;
     let fpsTopMargin = 100;
+    let avgFpsArr = avgData.avgFpsArray;
+    console.log(avgFpsArr);
     let fpsBottom = fpsTopMargin+avgFps;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -75,7 +77,8 @@ function handleData(data){
         if (frame.name == 'error'){
             testParts.errors.arr.push({
                 start: dotPos,
-                finish: dotPos + 4
+                finish: dotPos + 4,
+                data: frame
             })
         }
         if (frame.name == 'update'){    
@@ -90,6 +93,12 @@ function handleData(data){
             construstUndoData(dotPos, frame, i == data.frameData.length-1);
         }
     }   
+    // draw fps avg array lines
+    for (let i = 0; i < avgFpsArr.length; i++){
+        ctx.beginPath();
+        ctx.arc()
+        ctx.closePath();
+    }
 
     // draw timeline
     let timeLineTop = 30;
@@ -225,17 +234,21 @@ function getAvgFps(data){
     let fpsAmm = 0;
     let testTimeStart = 0;
     let testTime = 0;
+    let avgFpsArray = [];
     for (let i = 0; i < data.frameData.length; i++){
         let frame = data.frameData[i];
         if (frame.name == 'update'){
             if (!testTimeStart) testTimeStart = frame.time;
             testTime = frame.time - testTimeStart;
-            fpsSum += frame.fps;
+            fpsSum += frame.fps; 
             fpsAmm++;
+            if (!data.frameData[i-1] || frame.avgFps != data.frameData[i-1].avgFps){
+                avgFpsArray.push(frame.avgFps);
+            }
         }
     }
     let avgFps = Math.ceil(fpsSum / fpsAmm); 
-    return { avgFps, fpsAmm, testTime};
+    return { avgFps, fpsAmm, testTime, avgFpsArray};
 }
 
 function compareValues(a, b){
