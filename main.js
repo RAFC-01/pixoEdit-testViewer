@@ -250,7 +250,7 @@ function getAvgFps(data){
     let lastFrame;
     for (let i = 0; i < data.frameData.length; i++){
         let frame = data.frameData[i];
-        if (frame.name == 'update'){
+        if (frame.name == 'update' && frame.fps){
             if (!testTimeStart) testTimeStart = frame.time;
             testTime = frame.time - testTimeStart;
             fpsSum += frame.fps; 
