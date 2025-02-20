@@ -27,11 +27,43 @@ document.addEventListener('drop', (e)=>{
     }
 });
 let avgFps;
+let currentLoadedBounds;
 
 let testParts = {};
 
+let marginRight = 30;
+let marginLeft = 20;
+/** @type {Array} */
+let currLoadedData;
+document.addEventListener('wheel', (e) => {
+    let x = e.clientX - marginLeft;
+    let xProcentage = clamp(Math.floor(x / (canvas.width-marginRight) * 100) / 100, 0, 1);
+
+    if (currentLoadedBounds){
+        let d = currentLoadedBounds;
+        console.log(xProcentage);
+        let currDataSize = d.finish - d.start;
+        let currentZoomPos = Math.floor(currDataSize * xProcentage);
+
+        let zoomMoveAmm = Math.floor(currDataSize * 0.1);
+
+        console.log(currentZoomPos, zoomMoveAmm);
+
+        let newData = currLoadedData;
+        newData.frameData = newData.frameData.slice(d.start + zoomMoveAmm, d.finish - zoomMoveAmm);
+        handleData(newData);
+
+    }
+
+})
+
 function handleData(data){
     if (!data) return;
+    currLoadedData = data;
+    currentLoadedBounds = {
+        start: 0,
+        finish: data.frameData.length
+    };    
     console.log(data);
     testParts = {
         errors: {arr: []}
@@ -45,11 +77,10 @@ function handleData(data){
     let avgFpsArr = avgData.avgFpsArray;
     let fpsBottom = fpsTopMargin+avgFps;
 
+    console.log('test time:', Math.floor(avgData.testTime / 1000) + ' sec');
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
-
-    let marginRight = 30;
-    let marginLeft = 20;
 
     // draw fps lines
     let jump = avgFps < 1 ? 5 : 10;
@@ -232,6 +263,7 @@ function construstParts(dotPos, frame, valuesToCheck = [], isLast){
 function construstUndoData(dotPos, frame, isLast){
     if (!testParts['undo/redo']) testParts['undo/redo'] = { arr: []};
     let s = testParts['undo/redo'];
+    console.log(frame);
     s.arr.push({
         start: dotPos,
         finish: dotPos+4,
@@ -284,3 +316,7 @@ function compareValues(a, b){
 }
 
 handleData(testData);
+
+function clamp(value, min, max){
+    return Math.max(Math.min(value, max), min);
+}
