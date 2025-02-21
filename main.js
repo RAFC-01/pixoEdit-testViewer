@@ -49,42 +49,34 @@ let marginLeft = 20;
 let currLoadedData;
 document.addEventListener('wheel', (e) => {
     let x = e.clientX - marginLeft;
-    let xProcentage = clamp(Math.floor(x / (canvas.width-marginRight) * 100) / 100, 0, 1);
+    let xProcentage = clamp((x / (canvas.width - marginRight)), 0, 1);
+    let dir = Math.sign(e.deltaY) * -1; // -1 zoom in, 1 zoom out
 
-    let dir = clamp(e.deltaY, -1, 1);
-
-    if (currentLoadedBounds){
+    if (currentLoadedBounds) {
         let d = currentLoadedBounds;
-        console.log(xProcentage);
         let currDataSize = d.finish - d.start;
-        let currentZoomPos = Math.floor(currDataSize * xProcentage);
+        let zoomMoveAmm = Math.floor(currDataSize * 0.1); // 10% zoom
 
-        let zoomMoveAmm = 100;
+        let currentZoomPos = d.start + Math.floor(currDataSize * xProcentage);
 
-        let currentZoomStart = currentZoomPos - currDataSize / 2;
-        let currentZoomFinish = currentZoomPos + currDataSize / 2;
-        console.log(currentZoomStart, currentZoomFinish); 
+        let newStart = currentZoomPos - ((currentZoomPos - d.start) / currDataSize) * (currDataSize - dir * zoomMoveAmm);
+        let newFinish = currentZoomPos + ((d.finish - currentZoomPos) / currDataSize) * (currDataSize - dir * zoomMoveAmm);
 
-        // console.log(currentZoomPos, zoomMoveAmm);
+        // Ensure bounds don't go out of range
+        newStart = Math.max(newStart, 0);
+        newFinish = Math.min(newFinish, firstStartData.frameData.length);
 
-        let newBounds = {
-            start: dir == -1 ? currentZoomStart + zoomMoveAmm : currentZoomStart - zoomMoveAmm,
-            finish: dir == -1 ? currentZoomFinish - zoomMoveAmm : currentZoomFinish + zoomMoveAmm,
-        }
-
-        let newData = currLoadedData;
-        console.log(newData);
-        newData.frameData = firstStartData.frameData.slice(Math.max(newBounds.start, 0), Math.min(newBounds.finish, firstStartData.frameData.length));
+        let newData = { ...currLoadedData };
+        newData.frameData = firstStartData.frameData.slice(Math.floor(newStart), Math.floor(newFinish));
 
         currentLoadedBounds = {
-            start: Math.max(newBounds.start, 0),
-            finish: Math.min(newBounds.finish, firstStartData.frameData.length)
-        }
+            start: Math.floor(newStart),
+            finish: Math.floor(newFinish)
+        };
 
         handleData(newData);
     }
-
-})
+});
 
 function handleData(data){
     if (!data) return;
