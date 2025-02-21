@@ -7,6 +7,8 @@ canvas.height = document.body.offsetHeight;
 document.addEventListener("dragover", (e)=> {
     e.preventDefault();
 });
+let firstStartTime = 0;
+let firstStartData;
 document.addEventListener('drop', (e)=>{
     e.preventDefault();
     const reader = new FileReader();
@@ -20,6 +22,8 @@ document.addEventListener('drop', (e)=>{
                 // console.log();
                 reader.addEventListener('load', ()=> {
                     let droppedData = JSON.parse(reader.result);
+                    firstStartData = {systemInfo: droppedData.systemInfo, frameData: droppedData.frameData};
+                    firstStartTime = getStartTime(droppedData.frameData);
                     handleData(droppedData);
                 }, false);
             }
@@ -28,6 +32,14 @@ document.addEventListener('drop', (e)=>{
 });
 let avgFps;
 let currentLoadedBounds;
+
+function getStartTime(frameData){
+    for (let i = 0; i < frameData.length; i++){
+        if (frameData[i].name){
+            return frameData[i].time;
+        }
+    }
+}
 
 let testParts = {};
 
@@ -39,20 +51,37 @@ document.addEventListener('wheel', (e) => {
     let x = e.clientX - marginLeft;
     let xProcentage = clamp(Math.floor(x / (canvas.width-marginRight) * 100) / 100, 0, 1);
 
+    let dir = clamp(e.deltaY, -1, 1);
+
     if (currentLoadedBounds){
         let d = currentLoadedBounds;
         console.log(xProcentage);
         let currDataSize = d.finish - d.start;
         let currentZoomPos = Math.floor(currDataSize * xProcentage);
 
-        let zoomMoveAmm = Math.floor(currDataSize * 0.1);
+        let zoomMoveAmm = 100;
 
-        console.log(currentZoomPos, zoomMoveAmm);
+        let currentZoomStart = currentZoomPos - currDataSize / 2;
+        let currentZoomFinish = currentZoomPos + currDataSize / 2;
+        console.log(currentZoomStart, currentZoomFinish); 
+
+        // console.log(currentZoomPos, zoomMoveAmm);
+
+        let newBounds = {
+            start: dir == -1 ? currentZoomStart + zoomMoveAmm : currentZoomStart - zoomMoveAmm,
+            finish: dir == -1 ? currentZoomFinish - zoomMoveAmm : currentZoomFinish + zoomMoveAmm,
+        }
 
         let newData = currLoadedData;
-        newData.frameData = newData.frameData.slice(d.start + zoomMoveAmm, d.finish - zoomMoveAmm);
-        handleData(newData);
+        console.log(newData);
+        newData.frameData = firstStartData.frameData.slice(Math.max(newBounds.start, 0), Math.min(newBounds.finish, firstStartData.frameData.length));
 
+        currentLoadedBounds = {
+            start: Math.max(newBounds.start, 0),
+            finish: Math.min(newBounds.finish, firstStartData.frameData.length)
+        }
+
+        handleData(newData);
     }
 
 })
@@ -60,11 +89,11 @@ document.addEventListener('wheel', (e) => {
 function handleData(data){
     if (!data) return;
     currLoadedData = data;
-    currentLoadedBounds = {
+    if (!currentLoadedBounds) currentLoadedBounds = {
         start: 0,
         finish: data.frameData.length
     };    
-    console.log(data);
+    // console.log(data);
     testParts = {
         errors: {arr: []}
     };
@@ -76,8 +105,10 @@ function handleData(data){
     let fpsTopMargin = 100;
     let avgFpsArr = avgData.avgFpsArray;
     let fpsBottom = fpsTopMargin+avgFps;
+    let timeDiffFromStart = Math.floor((avgData.testTimeStart - firstStartTime) / 1000); // turn it to seconds
+    // console.log(timeDiffFromStart);
 
-    console.log('test time:', Math.floor(avgData.testTime / 1000) + ' sec');
+    console.log('Sample time:', Math.floor(avgData.testTime / 1000) + ' sec');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
@@ -163,7 +194,7 @@ function handleData(data){
         ctx.fillRect(marginLeft + timeMarkGap * i, fpsBottom + timeLineTop - lineHeight/2 + 1, 2, lineHeight);
         
         let textWidth = ctx.measureText(i*0.5).width;
-        ctx.fillText(i*0.5, marginLeft + timeMarkGap * i - textWidth/2, fpsBottom + timeLineTop - lineHeight/2 - 2);
+        ctx.fillText((i+timeDiffFromStart*2)*0.5, marginLeft + timeMarkGap * i - textWidth/2, fpsBottom + timeLineTop - lineHeight/2 - 2);
     }
 
     
@@ -299,7 +330,7 @@ function getAvgFps(data){
         avgFpsArray.push(lastFrame.avgFps);
     }
     let avgFps = Math.ceil(fpsSum / fpsAmm); 
-    return { avgFps, fpsAmm, testTime, avgFpsArray};
+    return { avgFps, fpsAmm, testTime, avgFpsArray, testTimeStart};
 }
 
 function compareValues(a, b){
@@ -315,7 +346,12 @@ function compareValues(a, b){
     }
 }
 
-handleData(testData);
+if (testData){
+    firstStartTime = getStartTime(testData.frameData);
+    firstStartData = {systemInfo: testData.systemInfo, frameData: testData.frameData};
+    handleData(testData);
+}
+
 
 function clamp(value, min, max){
     return Math.max(Math.min(value, max), min);
