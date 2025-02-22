@@ -6,3 +6,8 @@ body{
     overflow: hidden;
     background-color: #2a2a2a;
 }
+#UI_canvas{
+    position: fixed;
+    top: 0px;
+    left: 0px;
+}

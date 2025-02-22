@@ -4,9 +4,109 @@ const ctx = canvas.getContext('2d');
 canvas.width = document.body.offsetWidth;
 canvas.height = document.body.offsetHeight;
 
+/** @type {HTMLCanvasElement} */
+const uiCanvas = document.querySelector('canvas#UI_canvas');
+const uiCtx = uiCanvas.getContext('2d');
+
+uiCanvas.width = canvas.width;
+uiCanvas.height = canvas.height;
+
 document.addEventListener("dragover", (e)=> {
     e.preventDefault();
 });
+
+let isMouseDown = false;
+
+document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+});
+
+document.addEventListener('mousedown', () => {
+    isMouseDown = true;
+});
+
+document.addEventListener('mouseup', () => {
+    isMouseDown = false;
+});
+
+let currentDisplayedData = {};
+
+document.addEventListener('mousemove', (e) => {
+    if (isMouseDown){
+        uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+        let posX = e.clientX;
+        let x = e.clientX - marginLeft;
+        let xProcentage = clamp((x / (canvas.width - marginRight)), 0, 1);    
+
+        if (currentLoadedBounds){
+            let d = currentLoadedBounds;
+            let currDataSize = d.finish - d.start;
+            let currIndex = Math.floor(currDataSize * xProcentage);
+            let update = currLoadedData.frameData[currIndex];
+    
+            uiCtx.fillStyle = 'white';
+            
+            uiCtx.fillText(update.currentTool || update.name, posX, 320); 
+            uiCtx.fillRect(posX, 320, 1, 220);
+            
+            
+            let dataToDisplay = getThingsAroundIndex(currIndex, 5);
+
+            let windowX = 16;
+            let windowY = 750;
+
+            uiCtx.beginPath();
+            uiCtx.fillStyle = 'gray';
+            uiCtx.strokeStyle = 'red';
+
+            uiCtx.rect(windowX, windowY, 200, 200);
+            uiCtx.fill();
+            uiCtx.stroke();
+            uiCtx.closePath();
+
+            uiCtx.fillStyle = 'black';
+            uiCtx.font = '16px Arial';
+
+            let distFromTop = 24;
+
+            uiCtx.fillText(update.currentTool || update.name, windowX + 4, windowY + 16);
+            uiCtx.fillRect(windowX, windowY + 24, 200, 2);
+            if (dataToDisplay.selectionData){
+                distFromTop += 16;
+                uiCtx.fillText('selection data: ', windowX + 4, windowY + distFromTop);
+                distFromTop += 16;
+                uiCtx.fillText(`start: x ${dataToDisplay.selectionData.start.x} y ${dataToDisplay.selectionData.start.y}` , windowX + 4, windowY + distFromTop);
+                distFromTop += 16;
+                uiCtx.fillText(`size: x ${dataToDisplay.selectionData.size.x} y ${dataToDisplay.selectionData.size.y}` , windowX + 4, windowY + distFromTop);
+                distFromTop += 16;
+                uiCtx.fillText(`offset: x ${dataToDisplay.selectionData.offset.x} y ${dataToDisplay.selectionData.offset.y}` , windowX + 4, windowY + distFromTop);
+            }
+            for (let i = 0; i < dataToDisplay.errs.length; i++){
+                console.log(dataToDisplay.errs[i]);                                
+            }
+
+            currentDisplayedData = update;
+        }
+    }
+});
+
+// gets the element as one object getting as much data as possible from all of them
+function getThingsAroundIndex(index, amm){
+    let data = {errs: [], ums: []};
+    for (let i = index-amm; i < index+amm; i++){
+        let f = currLoadedData.frameData[i];
+        if (f){
+            if (!data.selectionData) data.selectionData = f.selectionData;
+            if (f.name == 'undoManager') data.ums.push({
+                action: f.action,
+                toolName: f.toolName
+            });
+            if (f.name == 'error') data.errs.push(f.err_message); 
+        };
+    }
+    return data;
+}
+
 let firstStartTime = 0;
 let firstStartData;
 document.addEventListener('drop', (e)=>{
