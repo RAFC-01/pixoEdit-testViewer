@@ -1,6 +1,30 @@
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
+/**
+ * @typedef {Object} OutlineData
+ * @property {{x: number, y: number}} size
+ * @property {{x: number, y: number}} start
+*/
+/**
+ * @typedef {Object} frameData
+ * @property {string} name
+ * @property {boolean} isDragging
+ * @property {boolean} isSelected
+ * @property {boolean} isDraggingSelect
+ * @property {boolean} isScalingSelect
+ * @property {string} currentTool
+ * @property {object} toolOptions
+ * @property {boolean} isPreviewOn
+ * @property {number} time
+ * @property {{x: number, y: number}} spriteSize
+ * @property {{x: number, y: number}} mousePos
+ * @property {OutlineData} selectionData
+ * @property {number} toolSize
+ * @property {number} avgFps
+ * @property {boolean} isBlured
+ */
+
 canvas.width = document.body.offsetWidth;
 canvas.height = document.body.offsetHeight;
 
@@ -43,7 +67,8 @@ document.addEventListener('mousemove', (e) => {
             let currDataSize = d.finish - d.start;
             let currIndex = Math.floor(currDataSize * xProcentage);
             let update = currLoadedData.frameData[currIndex];
-    
+            
+            if (!update) return;
             uiCtx.fillStyle = 'white';
             
             uiCtx.fillText(update.currentTool || update.name, posX, 320); 
@@ -67,19 +92,31 @@ document.addEventListener('mousemove', (e) => {
             uiCtx.fillStyle = 'black';
             uiCtx.font = '16px Arial';
 
-            let distFromTop = 24;
+            let distFromTop = 2;
 
-            uiCtx.fillText(update.currentTool || update.name, windowX + 4, windowY + 16);
+            const drawText = (text) => {
+                distFromTop += 16;
+                uiCtx.fillText(text, windowX + 4, windowY + distFromTop);
+            }
+
+            let frameData = dataToDisplay.allData;
+
+            let avgFpsText = frameData.avgFps ? ` (${Math.floor(frameData.avgFps)}fps)` : '';
+
+            drawText((update.currentTool || update.name) + avgFpsText);
+
+            distFromTop += 8;
+
             uiCtx.fillRect(windowX, windowY + 24, 200, 2);
-            if (dataToDisplay.selectionData){
-                distFromTop += 16;
-                uiCtx.fillText('selection data: ', windowX + 4, windowY + distFromTop);
-                distFromTop += 16;
-                uiCtx.fillText(`start: x ${dataToDisplay.selectionData.start.x} y ${dataToDisplay.selectionData.start.y}` , windowX + 4, windowY + distFromTop);
-                distFromTop += 16;
-                uiCtx.fillText(`size: x ${dataToDisplay.selectionData.size.x} y ${dataToDisplay.selectionData.size.y}` , windowX + 4, windowY + distFromTop);
-                distFromTop += 16;
-                uiCtx.fillText(`offset: x ${dataToDisplay.selectionData.offset.x} y ${dataToDisplay.selectionData.offset.y}` , windowX + 4, windowY + distFromTop);
+
+            if (frameData.isScalingSelect) drawText("isScaling: true");
+            if (frameData.isDraggingSelect) drawText("isDragging: true");
+
+            if (frameData.selectionData){
+                drawText('selection data:');
+                drawText(`start: x ${frameData.selectionData.start.x} y ${frameData.selectionData.start.y}`);
+                drawText(`size: x ${frameData.selectionData.size.x} y ${frameData.selectionData.size.y}`);
+                drawText(`offset: x ${frameData.selectionData.offset.x} y ${frameData.selectionData.offset.y}`);
             }
             for (let i = 0; i < dataToDisplay.errs.length; i++){
                 console.log(dataToDisplay.errs[i]);                                
@@ -91,18 +128,20 @@ document.addEventListener('mousemove', (e) => {
 });
 
 // gets the element as one object getting as much data as possible from all of them
-function getThingsAroundIndex(index, amm){
-    let data = {errs: [], ums: []};
-    for (let i = index-amm; i < index+amm; i++){
-        let f = currLoadedData.frameData[i];
-        if (f){
-            if (!data.selectionData) data.selectionData = f.selectionData;
-            if (f.name == 'undoManager') data.ums.push({
-                action: f.action,
-                toolName: f.toolName
-            });
-            if (f.name == 'error') data.errs.push(f.err_message); 
-        };
+/**
+ * 
+ * @param {number} index 
+ * @returns {{errs: Array, ums: Array, allData: frameData}}
+ */
+function getThingsAroundIndex(index){
+    let f = currLoadedData.frameData[index];
+    let data = {errs: [], ums: [], allData: f};
+    if (f){
+        if (f.name == 'undoManager') data.ums.push({
+            action: f.action,
+            toolName: f.toolName
+        });
+        if (f.name == 'error') data.errs.push(f.err_message); 
     }
     return data;
 }
@@ -226,7 +265,7 @@ function handleData(data){
     let highestFps = 0;
     for (let i = 0; i < data.frameData.length; i++){
         let frame = data.frameData[i];
-        let dotPos = dist * i + marginLeft;
+        let dotPos = Math.floor(dist * i + marginLeft);
         if (frame.name == 'error'){
             testParts.errors.arr.push({
                 start: dotPos,
@@ -236,7 +275,7 @@ function handleData(data){
         }
         if (frame.name == 'update'){    
             ctx.fillStyle = '#00ffff99';
-            ctx.fillRect(dotPos, fpsBottom - frame.fps, 3, 3);
+            ctx.fillRect(dotPos, Math.floor(fpsBottom - frame.fps), 3, 3);
             if (highestFps < frame.fps) highestFps = frame.fps;
             construstParts(dotPos, frame, ['isDrawing', 'isPreviewOn', 'currentTool', 'spriteSize', 'isSelected'], i == data.frameData.length-1);
             
